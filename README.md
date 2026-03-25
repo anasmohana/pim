@@ -26,7 +26,7 @@ A command-line tool for managing Microsoft Azure Privileged Identity Management 
 
 ```bash
 # Install directly from GitHub
-go install github.com/YOUR_USERNAME/pim/cmd/pim@latest
+go install github.com/anasmohana/pim/cmd/pim@latest
 
 # The binary will be installed to $GOPATH/bin (usually ~/go/bin)
 # Make sure this directory is in your PATH
@@ -36,7 +36,7 @@ go install github.com/YOUR_USERNAME/pim/cmd/pim@latest
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/pim.git
+git clone https://github.com/anasmohana/pim.git
 cd pim
 
 # Build the binary
@@ -48,7 +48,7 @@ sudo mv pim /usr/local/bin/
 
 ### Option 3: Download pre-built binaries
 
-Download the latest release from the [Releases page](https://github.com/YOUR_USERNAME/pim/releases).
+Download the latest release from the [Releases page](https://github.com/anasmohana/pim/releases).
 
 ## Usage
 
