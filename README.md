@@ -10,7 +10,6 @@ A command-line tool for managing Microsoft Azure Privileged Identity Management 
   - Works with Azure CLI authentication
 - ⚠️ **Azure AD Roles** - Limited support
   - Azure CLI tokens lack required PIM permissions
-  - See [AZURE_AD_PIM.md](AZURE_AD_PIM.md) for workarounds
   - Use Azure Portal for Azure AD role management
 - Uses Azure CLI authentication (no credentials stored)
 - Validates subscription context before operations
@@ -23,16 +22,33 @@ A command-line tool for managing Microsoft Azure Privileged Identity Management 
 
 ## Installation
 
+### Option 1: Install using `go install` (Recommended)
+
 ```bash
-# Clone or navigate to the project directory
+# Install directly from GitHub
+go install github.com/YOUR_USERNAME/pim/cmd/pim@latest
+
+# The binary will be installed to $GOPATH/bin (usually ~/go/bin)
+# Make sure this directory is in your PATH
+```
+
+### Option 2: Build from source
+
+```bash
+# Clone the repository
+git clone https://github.com/YOUR_USERNAME/pim.git
 cd pim
 
 # Build the binary
 go build -o pim ./cmd/pim
 
-# Optional: Install to system path
-go install ./cmd/pim
+# Optional: Move to a directory in your PATH
+sudo mv pim /usr/local/bin/
 ```
+
+### Option 3: Download pre-built binaries
+
+Download the latest release from the [Releases page](https://github.com/YOUR_USERNAME/pim/releases).
 
 ## Usage
 
