@@ -98,18 +98,18 @@ This will:
 ║   PIM Manager - Interactive Mode        ║
 ╚══════════════════════════════════════════╝
 
-✓ Found 14 eligible role(s)
+✓ Found 12 eligible role(s)
 
 #   SUBSCRIPTION              ROLE NAME                  RESOURCE       EXPIRES
 -   ------------              ---------                  --------       -------
-1   Production-App           Contributor                Subscription   2026-12-01
-2   Production-Database      Owner                      Subscription   2026-10-01
-3   Staging-Environment             Contributor                Subscription   2026-08-15
-4   Development-Resources            KeyVault                   Subscription   2026-04-27
-5   Production-Database      Key Vault Administrator     Subscription
+1   Production-App            Contributor                Subscription   2026-12-01
+2   Production-Database       Owner                      Subscription   2026-10-01
+3   Staging-Environment       Contributor                Subscription   2026-08-15
+4   Development-Resources     Reader                     Subscription   2026-04-27
+5   Shared-Services           Key Vault Administrator    Subscription
 ...
 
-Select a role to activate (1-14) or 0 to exit: 1
+Select a role to activate (1-12) or 0 to exit: 1
 
 ✓ Selected: Contributor in Production-App
 
@@ -167,7 +167,7 @@ Activate an eligible PIM role:
 # Azure AD role
 ./pim activate \
   --role-id <role-definition-id> \
-  --justification "Deploy critical security patch" \
+  --justification "Emergency production fix" \
   --duration PT8H \
   --type azuread
 
