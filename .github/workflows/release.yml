@@ -23,7 +23,7 @@ jobs:
           go-version: '1.21'
 
       - name: Import Code Signing Certificate
-        if: ${{ secrets.APPLE_CERTIFICATE_BASE64 != '' }}
+        if: secrets.APPLE_CERTIFICATE_BASE64 != ''
         env:
           CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
           CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -60,7 +60,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Sign macOS Binaries
-        if: ${{ secrets.APPLE_DEVELOPER_ID != '' }}
+        if: secrets.APPLE_DEVELOPER_ID != ''
         env:
           DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
         run: |
