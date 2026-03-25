@@ -19,6 +19,17 @@ builds:
     ignore:
       - goos: windows
         goarch: arm64
+    # Sign macOS binaries after build
+    hooks:
+      post:
+        - cmd: |
+            if [ "{{ .Os }}" = "darwin" ] && [ -n "$DEVELOPER_ID" ]; then
+              codesign --force --sign "$DEVELOPER_ID" --timestamp "{{ .Path }}"
+              codesign --verify --verbose "{{ .Path }}"
+              echo "Signed {{ .Path }}"
+            fi
+          env:
+            - DEVELOPER_ID={{ .Env.DEVELOPER_ID }}
 
 archives:
   - id: pim

@@ -59,16 +59,4 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Sign macOS Binaries
-        env:
           DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
-        run: |
-          # Find and sign all macOS binaries in dist
-          find dist -name "pim" -type f | while read binary; do
-            if file "$binary" | grep -q "Mach-O"; then
-              echo "Signing $binary..."
-              codesign --force --sign "$DEVELOPER_ID" --timestamp "$binary"
-              codesign --verify --verbose "$binary"
-            fi
-          done
