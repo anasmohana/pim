@@ -38,8 +38,10 @@ jobs:
           # Import certificate
           CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
           echo "$CERTIFICATE_BASE64" | base64 --decode -o "$CERTIFICATE_PATH"
+
+          # Import p12 with empty password (trim spaces from secret)
           security import "$CERTIFICATE_PATH" \
-            -P "$CERTIFICATE_PASSWORD" \
+            -P "" \
             -A \
             -t cert \
             -f pkcs12 \
