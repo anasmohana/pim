@@ -286,10 +286,7 @@ pim/
 
 **Solution:**
 - ✅ **Azure Resource PIM works perfectly** - use it for subscription roles (Contributor, Owner, etc.)
-- For Azure AD directory roles, use:
-  - [Azure Portal PIM](https://portal.azure.com/#view/Microsoft_Azure_PIMCommon/ActivationMenuBlade/~/aadmigratedroles)
-  - PowerShell with `Connect-AzureAD`
-  - See [AZURE_AD_PIM.md](AZURE_AD_PIM.md) for detailed workarounds
+- For Azure AD directory roles, use the [Azure Portal PIM](https://portal.azure.com/#view/Microsoft_Azure_PIMCommon/ActivationMenuBlade/~/aadmigratedroles) instead
 
 ### "API request failed with status 403" (Azure Resource roles)
 - Ensure you have PIM roles assigned for the subscription
