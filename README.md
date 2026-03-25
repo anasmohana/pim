@@ -46,9 +46,22 @@ go build -o pim ./cmd/pim
 sudo mv pim /usr/local/bin/
 ```
 
-### Option 3: Download pre-built binaries
+### Option 3: Download pre-built binaries (No Go required)
 
-Download the latest release from the [Releases page](https://github.com/anasmohana/pim/releases).
+1. Go to the [Releases page](https://github.com/anasmohana/pim/releases)
+2. Download the appropriate binary for your system:
+   - **macOS (Intel)**: `pim_*_darwin_amd64.tar.gz`
+   - **macOS (Apple Silicon)**: `pim_*_darwin_arm64.tar.gz`
+   - **Linux (64-bit)**: `pim_*_linux_amd64.tar.gz`
+   - **Windows (64-bit)**: `pim_*_windows_amd64.zip`
+3. Extract and move to your PATH:
+   ```bash
+   # macOS/Linux
+   tar -xzf pim_*_*.tar.gz
+   sudo mv pim /usr/local/bin/
+
+   # Windows: Extract the zip and add to your PATH
+   ```
 
 ## Usage
 
