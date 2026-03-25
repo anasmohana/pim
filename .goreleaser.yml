@@ -3,33 +3,42 @@ before:
     - go mod tidy
 
 builds:
-  - id: pim
+  - id: pim-linux
     main: ./cmd/pim
     binary: pim
     env:
       - CGO_ENABLED=0
     goos:
       - linux
-      - darwin
-      - windows
     goarch:
       - amd64
       - arm64
-    # Ignore arm64 for Windows (not commonly used)
-    ignore:
-      - goos: windows
-        goarch: arm64
+
+  - id: pim-windows
+    main: ./cmd/pim
+    binary: pim
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - windows
+    goarch:
+      - amd64
+
+  - id: pim-darwin
+    main: ./cmd/pim
+    binary: pim
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
     # Sign macOS binaries after build
     hooks:
       post:
-        - cmd: |
-            if [ "{{ .Os }}" = "darwin" ] && [ -n "$DEVELOPER_ID" ]; then
-              codesign --force --sign "$DEVELOPER_ID" --timestamp "{{ .Path }}"
-              codesign --verify --verbose "{{ .Path }}"
-              echo "Signed {{ .Path }}"
-            fi
-          env:
-            - DEVELOPER_ID={{ .Env.DEVELOPER_ID }}
+        - codesign --force --sign "{{ .Env.DEVELOPER_ID }}" --timestamp "{{ .Path }}"
+        - codesign --verify --verbose "{{ .Path }}"
 
 archives:
   - id: pim
