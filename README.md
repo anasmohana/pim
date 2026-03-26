@@ -1,38 +1,45 @@
 # PIM Manager
 
-A command-line tool for managing Microsoft Azure Privileged Identity Management (PIM) role activations.
+A command-line tool for managing Microsoft Azure Privileged Identity Management (PIM) role activations, inspired by [pim-activate](https://github.com/dnb/pim-activate).
 
 ## Features
 
+- ✅ **Azure AD Groups** - Fully supported
 - ✅ **Azure Resource Roles** - Fully supported (Contributor, Owner, etc.)
-  - List eligible and active roles
-  - Activate/deactivate with justification
-  - Works with Azure CLI authentication
-- ⚠️ **Azure AD Roles** - Limited support
-  - Azure CLI tokens lack required PIM permissions
-  - Use Azure Portal for Azure AD role management
-- Uses Azure CLI authentication (no credentials stored)
-- Validates subscription context before operations
+- ✅ **Microsoft Entra Roles** - Fully supported
+- ✅ **MFA/ACRS Authentication** - Auto-detects and handles MFA challenges
+- ✅ **Interactive UI** - Select roles interactively or activate by name
+- ✅ **Smart Filtering** - Filters out already-active roles from eligible list
+- ✅ **Direct Activation** - `pim -g my-group-name` for quick activation
+- ✅ **Deactivation Support** - Full deactivation support for all PIM types
+- ✅ **Policy-Aware** - Auto-detects maximum allowed duration per role
 
 ## Prerequisites
 
-- Go 1.19 or later
-- Azure CLI installed and configured
+- Go 1.19 or later (for building from source)
+- Azure CLI installed and configured (`az login`)
 - Valid Azure subscription with PIM-enabled roles
 
 ## Installation
 
-### Option 1: Install using `go install` (Recommended)
+### Homebrew (Recommended for macOS)
 
 ```bash
-# Install directly from GitHub
-go install github.com/anasmohana/pim/cmd/pim@latest
+# Add the tap
+brew tap anasmohana/pim https://github.com/anasmohana/pim.git
 
-# The binary will be installed to $GOPATH/bin (usually ~/go/bin)
-# Make sure this directory is in your PATH
+# Install
+brew install pim
+
+# That's it! The tool is now available as 'pim'
 ```
 
-### Option 2: Build from source
+**Update later:**
+```bash
+brew upgrade pim
+```
+
+### Build from Source (All Platforms)
 
 ```bash
 # Clone the repository
@@ -43,25 +50,19 @@ cd pim
 go build -o pim ./cmd/pim
 
 # Optional: Move to a directory in your PATH
+# macOS/Linux:
 sudo mv pim /usr/local/bin/
+
+# Windows: Add to your PATH or use directly
 ```
 
-### Option 3: Download pre-built binaries (No Go required)
+### Download Pre-built Binaries (GitHub Releases)
+
+For Windows users or those who prefer pre-built binaries:
 
 1. Go to the [Releases page](https://github.com/anasmohana/pim/releases)
-2. Download the appropriate binary for your system:
-   - **macOS (Intel)**: `pim_*_darwin_amd64.tar.gz`
-   - **macOS (Apple Silicon)**: `pim_*_darwin_arm64.tar.gz`
-   - **Linux (64-bit)**: `pim_*_linux_amd64.tar.gz`
-   - **Windows (64-bit)**: `pim_*_windows_amd64.zip`
-3. Extract and move to your PATH:
-   ```bash
-   # macOS/Linux
-   tar -xzf pim_*_*.tar.gz
-   sudo mv pim /usr/local/bin/
-
-   # Windows: Extract the zip and add to your PATH
-   ```
+2. Download the appropriate binary for your system
+3. Extract and use directly (no code signing needed for internal tools)
 
 ## Usage
 
@@ -73,205 +74,142 @@ The tool uses Azure CLI for authentication. Before using the tool, ensure you're
 az login
 ```
 
+### Quick Examples
+
+```bash
+# Interactive mode - select PIM type, then select role
+pim
+
+# Activate an Azure AD Group directly
+pim -g aws-pim-access
+
+# Activate an Azure Resource role
+pim -r
+
+# Activate a Microsoft Entra Role
+pim -e
+
+# Deactivate a Group role
+pim d -g
+
+# Deactivate a Resource role
+pim deactivate -r
+```
+
+### Command-Line Options
+
+```
+Usage: pim [OPTIONS] [ACTION]
+
+Options:
+  -h, --help          Show this help message
+  -g, --group [NAME]  PIM type: Azure AD Groups
+  -r, --resource [NAME] PIM type: Azure Resources
+  -e, --entra [NAME]  PIM type: Microsoft Entra Roles
+
+Actions:
+  deactivate, d       Deactivate an active role
+
+Examples:
+  pim                     # Interactive mode with PIM type selection
+  pim -g                  # List and activate Azure AD Groups
+  pim -g my-group-name    # Activate specific group by name
+  pim -r                  # List and activate Azure Resources
+  pim -e                  # List and activate Entra Roles
+  pim d -g                # Deactivate a group role
+  pim deactivate -r       # Deactivate a resource role
+```
+
+### Interactive Mode
+
+Simply run `pim` without any arguments for an interactive experience:
+
+```bash
+./pim
+```
+
 The tool will:
-1. Check for valid Azure CLI tokens
-2. Display your current tenant
-3. Check PIM roles across ALL your subscriptions
+1. Prompt you to select a PIM type (Groups, Resources, or Entra Roles)
+2. Show all eligible roles (excluding already-active ones)
+3. Let you select a role to activate
+4. Prompt for justification (defaults to "Routine administrative access")
+5. Prompt for duration (defaults to maximum allowed)
+6. Activate the role automatically
 
-### Quick Start - Interactive Mode (Recommended)
+### Direct Activation by Name
 
-Simply run the tool without any commands for an interactive experience:
-
-```bash
-./pim
-```
-
-This will:
-1. Show all your eligible PIM roles across all subscriptions
-2. Let you select a role by number
-3. Prompt for justification and duration
-4. Activate the role automatically
-
-**Example Interactive Session:**
-```
-╔══════════════════════════════════════════╗
-║   PIM Manager - Interactive Mode        ║
-╚══════════════════════════════════════════╝
-
-✓ Found 12 eligible role(s)
-
-#   SUBSCRIPTION              ROLE NAME                  RESOURCE       EXPIRES
--   ------------              ---------                  --------       -------
-1   Production-App            Contributor                Subscription   2026-12-01
-2   Production-Database       Owner                      Subscription   2026-10-01
-3   Staging-Environment       Contributor                Subscription   2026-08-15
-4   Development-Resources     Reader                     Subscription   2026-04-27
-5   Shared-Services           Key Vault Administrator    Subscription
-...
-
-Select a role to activate (1-12) or 0 to exit: 1
-
-✓ Selected: Contributor in Production-App
-
-Fetching role policy...
-✓ Maximum allowed duration: 5 hours
-
-Enter justification (reason for activation): Deploy critical security patch
-Enter duration in hours (default: 5, max: 5): 4
-
-✓ Role activated successfully!
-  The role 'Contributor' is now active for 4 hours.
-```
-
-### Smart Features
-
-#### 🔍 Dynamic Policy Detection
-The tool automatically fetches the PIM policy for each role to determine:
-- **Maximum allowed duration** - No more "ExpirationRule" errors!
-- **Default duration** - Uses the policy maximum as the default
-- **Input validation** - Prevents you from requesting more time than allowed
-
-Each PIM role can have different policies (5 hours, 8 hours, etc.). The tool detects this automatically.
-
-#### 🌍 Multi-Subscription Support
-Automatically checks **all** your Azure subscriptions for eligible roles:
-- Filters out cross-tenant subscriptions
-- Shows subscription name with each role
-- Activates in the correct subscription automatically
-
-### Commands
-
-#### List Eligible Roles
-
-List all roles available for activation:
+Activate a role directly by specifying its name:
 
 ```bash
-./pim list
+# Activate a specific group
+pim -g my-pim-group
+
+# Activate a specific resource role (partial match supported)
+pim -r contributor
+
+# Activate a specific Entra role
+pim -e "Global Administrator"
 ```
 
-This displays Azure Resource roles across all your subscriptions.
+### Deactivation
 
-#### Check Active Assignments
-
-View currently active role assignments:
+Deactivate active roles:
 
 ```bash
-./pim status
+# Interactive deactivation - select PIM type, then select role
+pim d
+
+# Deactivate a specific group
+pim d -g my-pim-group
+
+# Interactive deactivation of resource roles
+pim deactivate -r
 ```
 
-#### Activate a Role
+### MFA/ACRS Authentication
 
-Activate an eligible PIM role:
+The tool automatically detects when MFA or Conditional Access authentication is required:
 
-```bash
-# Azure AD role
-./pim activate \
-  --role-id <role-definition-id> \
-  --justification "Emergency production fix" \
-  --duration PT8H \
-  --type azuread
+1. When MFA is needed, the tool will automatically open your browser
+2. Complete the MFA challenge in the browser
+3. The tool will detect successful authentication and continue
+4. Your role will be activated automatically
 
-# Azure Resource role
-./pim activate \
-  --role-id <role-definition-id> \
-  --justification "Deploy new feature" \
-  --duration PT4H \
-  --type azureresource \
-  --scope "subscriptions/<subscription-id>"
-```
-
-**Parameters:**
-- `--role-id`: The role definition ID (get from `list` command)
-- `--justification`: Required reason for activation
-- `--duration`: Activation duration (default: PT5H = 5 hours)
-  - Format: ISO 8601 duration (PT1H = 1 hour, PT30M = 30 minutes)
-  - **Note**: Maximum duration is determined by your PIM policy (typically 5-8 hours)
-- `--type`: Role type - `azuread` or `azureresource` (default: azuread)
-- `--scope`: Scope for Azure resource roles (optional, defaults to current subscription)
-- `--ticket`: Ticket number (optional)
-- `--ticket-system`: Ticket system name (optional)
-
-#### Deactivate a Role
-
-Deactivate an active PIM role:
-
-```bash
-# Azure AD role
-./pim deactivate --role-id <role-definition-id> --type azuread
-
-# Azure Resource role
-./pim deactivate --role-id <role-definition-id> --type azureresource
-```
-
-## Examples
-
-### Interactive mode (Easiest - Recommended)
-```bash
-# Just run without arguments
-./pim
-
-# Follow the prompts to:
-# 1. See all eligible roles
-# 2. Select by number
-# 3. Enter justification
-# 4. Activate!
-```
-
-### List all eligible roles
-```bash
-./pim list
-```
-
-### Check active assignments
-```bash
-./pim status
-```
-
-### Manual activation (Advanced)
-```bash
-# Activate Contributor role on a subscription
-./pim activate \
-  --role-id b24988ac-6180-42a0-ab88-20f7382dd24c \
-  --justification "Deploy infrastructure changes" \
-  --duration PT4H \
-  --type azureresource \
-  --scope "subscriptions/<subscription-id>"
-```
-
-### Deactivate a role
-```bash
-./pim deactivate \
-  --role-id <role-definition-id> \
-  --type azureresource
-```
-
-## Project Structure
-
-```
-pim/
-├── cmd/pim/           # CLI application entry point
-│   └── main.go
-├── internal/
-│   ├── auth/          # Azure CLI authentication
-│   │   └── azcli.go
-│   └── pim/           # PIM client implementations
-│       ├── azuread.go
-│       └── azureresource.go
-├── pkg/models/        # Data models
-│   └── role.go
-├── go.mod
-└── README.md
-```
+This mirrors the behavior of the popular `pim-activate` bash script.
 
 ## How It Works
 
-1. **Authentication**: Uses `az account get-access-token` to retrieve tokens for Microsoft Graph and Azure Resource Manager APIs
+1. **Authentication**: Uses `az account get-access-token` to retrieve tokens for the MS PIM API
 2. **Token Validation**: Checks token expiration and prompts user to refresh if needed
-3. **Context Validation**: Displays current tenant and subscription, asks for confirmation
-4. **API Calls**: Makes authenticated REST API calls to:
-   - Microsoft Graph API (for Azure AD PIM)
-   - Azure Resource Manager API (for Azure Resource PIM)
-5. **Role Management**: Handles activation, deactivation, and listing of PIM roles
+3. **PIM API**: Makes authenticated REST API calls to `https://api.azrbac.mspim.azure.com`
+4. **Policy Detection**: Fetches role policies to determine maximum allowed duration
+5. **MFA Handling**: Detects MFA challenges, extracts claims, and re-authenticates
+6. **Smart Filtering**: Filters out already-active roles from the eligible list
+
+## Supported PIM Types
+
+### 1. Azure AD Groups (`-g`)
+Activate membership in Azure AD PIM-enabled groups. Useful for access to:
+- AWS accounts via SAML
+- GCP projects via SAML
+- Third-party applications
+- Network resources
+
+### 2. Azure Resources (`-r`)
+Activate Azure Resource roles at subscription, resource group, or resource level:
+- Contributor
+- Owner
+- Reader
+- Key Vault Administrator
+- Custom roles
+
+### 3. Microsoft Entra Roles (`-e`)
+Activate directory-level roles in Microsoft Entra ID:
+- Global Administrator
+- User Administrator
+- Security Administrator
+- Application Administrator
+- Custom roles
 
 ## Troubleshooting
 
@@ -281,28 +219,71 @@ pim/
 ### "access token has expired"
 - Run `az login` again to refresh your tokens
 
-### "PermissionScopeNotGranted" or Azure AD PIM returns 403
-**This is expected behavior** - Azure CLI tokens don't include the `RoleManagement.Read.Directory` scope required for Azure AD PIM.
+### "MFA/ACRS authentication required"
+- The tool will automatically open your browser for MFA
+- Complete the authentication challenge
+- The tool will automatically continue
 
-**Solution:**
-- ✅ **Azure Resource PIM works perfectly** - use it for subscription roles (Contributor, Owner, etc.)
-- For Azure AD directory roles, use the [Azure Portal PIM](https://portal.azure.com/#view/Microsoft_Azure_PIMCommon/ActivationMenuBlade/~/aadmigratedroles) instead
+### "failed to get PIM token"
+- Ensure you have access to PIM-enabled roles
+- Try running `az login` again
+- Verify your tenant has PIM configured
 
-### "API request failed with status 403" (Azure Resource roles)
-- Ensure you have PIM roles assigned for the subscription
-- Check that PIM is enabled for your subscription
-- Verify you're in the correct subscription with `az account show`
+### "'role-name' not found in eligible roles"
+- Check that the role name is correct (case-insensitive partial match supported)
+- Verify the role is eligible (not already active)
+- Ensure you have PIM access to that role
 
-### "please run 'az account set'"
-- Switch to the correct subscription using `az account set --subscription <subscription-id>`
+### "ActiveDurationTooShort"
+Roles must be active for at least 5 minutes before deactivation. This is a PIM policy restriction.
+
+## Differences from Bash Script
+
+This Go implementation provides several advantages over the original bash script:
+
+| Feature | Bash Script | Go Tool |
+|---------|-------------|---------|
+| Installation | Requires `gum`, `jq`, `az` | Single binary, only requires `az` |
+| Platform | macOS/Linux only | Cross-platform (Windows, macOS, Linux) |
+| Performance | Multiple process spawns | Native performance |
+| Error Handling | Basic | Comprehensive with retry logic |
+| Distribution | Homebrew tap | GitHub releases + go install |
+| Codebase | ~400 lines bash | Clean Go architecture |
+
+However, both tools share the same core functionality and user experience!
+
+## Project Structure
+
+```
+pim/
+├── cmd/pim/              # CLI application entry point
+│   └── main.go
+├── internal/
+│   ├── auth/             # Azure CLI authentication
+│   │   └── azcli.go
+│   └── pim/              # PIM client implementations
+│       └── unified.go    # Unified client for all PIM types
+├── pkg/models/           # Data models
+│   └── role.go
+├── go.mod
+└── README.md
+```
 
 ## API Permissions
 
-The tool requires the following:
+The tool requires:
 - User must be eligible for PIM roles
-- Access to Microsoft Graph API (via Azure CLI)
-- Access to Azure Resource Manager API (via Azure CLI)
+- Access to MS PIM API (via Azure CLI tokens)
+- MFA enrollment (if required by your organization)
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
 MIT
+
+## Credits
+
+Inspired by the excellent [pim-activate](https://github.com/dnb/pim-activate) bash script.

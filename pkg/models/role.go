@@ -6,25 +6,29 @@ import "time"
 type RoleType string
 
 const (
-	RoleTypeAzureAD       RoleType = "azuread"
+	RoleTypeAzureAD       RoleType = "azuread"       // Legacy
 	RoleTypeAzureResource RoleType = "azureresource"
+	RoleTypeGroups        RoleType = "groups"
+	RoleTypeEntraRoles    RoleType = "entraroles"
 )
 
 // RoleAssignment represents a PIM role assignment
 type RoleAssignment struct {
-	ID                string    `json:"id"`
-	RoleDefinitionID  string    `json:"roleDefinitionId"`
-	RoleName          string    `json:"roleName"`
-	PrincipalID       string    `json:"principalId"`
-	Scope             string    `json:"scope"`
-	SubscriptionName  string    `json:"subscriptionName,omitempty"`
-	ResourceName      string    `json:"resourceName,omitempty"`
-	Status            string    `json:"status"`
-	Type              RoleType  `json:"type"`
-	StartDateTime     time.Time `json:"startDateTime"`
-	EndDateTime       time.Time `json:"endDateTime"`
-	IsEligible        bool      `json:"isEligible"`
-	Justification     string    `json:"justification,omitempty"`
+	ID                             string    `json:"id"`
+	RoleDefinitionID               string    `json:"roleDefinitionId"`
+	ResourceID                     string    `json:"resourceId"`
+	RoleName                       string    `json:"roleName"`
+	PrincipalID                    string    `json:"principalId"`
+	Scope                          string    `json:"scope"`
+	SubscriptionName               string    `json:"subscriptionName,omitempty"`
+	ResourceName                   string    `json:"resourceName,omitempty"`
+	Status                         string    `json:"status"`
+	Type                           RoleType  `json:"type"`
+	StartDateTime                  time.Time `json:"startDateTime"`
+	EndDateTime                    time.Time `json:"endDateTime"`
+	IsEligible                     bool      `json:"isEligible"`
+	Justification                  string    `json:"justification,omitempty"`
+	LinkedEligibleRoleAssignmentID string    `json:"linkedEligibleRoleAssignmentId,omitempty"`
 }
 
 // ActivationRequest represents a request to activate a PIM role

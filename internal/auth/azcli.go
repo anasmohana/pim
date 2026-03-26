@@ -1,8 +1,10 @@
 package auth
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"time"
 )
@@ -142,4 +144,82 @@ func GetAllSubscriptions() ([]Subscription, error) {
 	}
 
 	return enabled, nil
+}
+
+// GetPIMToken gets an access token specifically for the MS PIM API
+func GetPIMToken() (string, error) {
+	tokenCmd := exec.Command("az", "account", "get-access-token",
+		"--resource", "https://api.azrbac.mspim.azure.com", "--output", "json")
+	tokenOutput, err := tokenCmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to get PIM access token: %w", err)
+	}
+
+	var tokenInfo struct {
+		AccessToken string `json:"accessToken"`
+	}
+
+	if err := json.Unmarshal(tokenOutput, &tokenInfo); err != nil {
+		return "", fmt.Errorf("failed to parse token info: %w", err)
+	}
+
+	return tokenInfo.AccessToken, nil
+}
+
+// ReauthenticateWithClaims re-authenticates using claims challenge for MFA/ACRS
+func ReauthenticateWithClaims(claimValue string) error {
+	fmt.Println("\n🔐 MFA/ACRS authentication required. Opening browser...")
+	fmt.Println("IMPORTANT: After completing the browser login, you MUST approve the")
+	fmt.Println("           request in your Azure Authenticator app (check your phone)!")
+	fmt.Println()
+
+	// Clear existing tokens to force fresh authentication (like bash script does)
+	clearCmd := exec.Command("az", "account", "clear")
+	clearCmd.Run() // Ignore errors
+
+	// Simple login - let Azure CLI handle the authentication naturally
+	loginCmd := exec.Command("az", "login")
+	loginCmd.Stdout = os.Stdout
+	loginCmd.Stderr = os.Stderr
+
+	if err := loginCmd.Run(); err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
+	}
+
+	fmt.Println("\n✓ Browser login successful!")
+	fmt.Println()
+	fmt.Print("Please approve the request in your Azure Authenticator app now...")
+	fmt.Println()
+	fmt.Print("Press Enter after you have approved in the authenticator app: ")
+
+	// Wait for user to confirm they've approved in authenticator
+	reader := bufio.NewReader(os.Stdin)
+	reader.ReadString('\n')
+
+	fmt.Println("✓ Proceeding with activation...")
+
+	return nil
+}
+
+// SimpleReauthenticate performs a simple re-authentication
+func SimpleReauthenticate() error {
+	fmt.Println("\n🔐 Authentication required. Opening browser...")
+	fmt.Println("Please complete the authentication...")
+
+	// Clear existing tokens first to force fresh login
+	clearCmd := exec.Command("az", "account", "clear")
+	clearCmd.Run() // Ignore errors
+
+	// Simple login without scope - let az rest handle scope negotiation
+	loginCmd := exec.Command("az", "login")
+	loginCmd.Stdout = os.Stdout
+	loginCmd.Stderr = os.Stderr
+
+	if err := loginCmd.Run(); err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
+	}
+
+	fmt.Println("✓ Authentication successful!")
+
+	return nil
 }

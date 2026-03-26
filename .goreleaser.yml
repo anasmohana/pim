@@ -3,42 +3,22 @@ before:
     - go mod tidy
 
 builds:
-  - id: pim-linux
+  - id: pim
     main: ./cmd/pim
     binary: pim
     env:
       - CGO_ENABLED=0
     goos:
       - linux
-    goarch:
-      - amd64
-      - arm64
-
-  - id: pim-windows
-    main: ./cmd/pim
-    binary: pim
-    env:
-      - CGO_ENABLED=0
-    goos:
       - windows
-    goarch:
-      - amd64
-
-  - id: pim-darwin
-    main: ./cmd/pim
-    binary: pim
-    env:
-      - CGO_ENABLED=0
-    goos:
       - darwin
     goarch:
       - amd64
       - arm64
-    # Sign macOS binaries after build
-    hooks:
-      post:
-        - codesign --force --sign "{{ .Env.DEVELOPER_ID }}" --timestamp "{{ .Path }}"
-        - codesign --verify --verbose "{{ .Path }}"
+    # Ignore invalid combinations
+    ignore:
+      - goos: windows
+        goarch: arm64
 
 archives:
   - id: pim
