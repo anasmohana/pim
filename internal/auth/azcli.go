@@ -1,11 +1,13 @@
 package auth
 
 import (
-	"bufio"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 )
 
@@ -169,34 +171,55 @@ func GetPIMToken() (string, error) {
 // ReauthenticateWithClaims re-authenticates using claims challenge for MFA/ACRS
 func ReauthenticateWithClaims(claimValue string) error {
 	fmt.Println("\n🔐 MFA/ACRS authentication required. Opening browser...")
-	fmt.Println("IMPORTANT: After completing the browser login, you MUST approve the")
-	fmt.Println("           request in your Azure Authenticator app (check your phone)!")
-	fmt.Println()
 
-	// Clear existing tokens to force fresh authentication (like bash script does)
+	//Clear existing tokens
 	clearCmd := exec.Command("az", "account", "clear")
 	clearCmd.Run() // Ignore errors
 
-	// Simple login - let Azure CLI handle the authentication naturally
-	loginCmd := exec.Command("az", "login")
+	// If we have a claim value, extract and encode it properly
+	var claimsB64 string
+	if claimValue != "" {
+		// URL decode the claim value
+		decoded, err := url.QueryUnescape(claimValue)
+		if err != nil {
+			decoded = claimValue
+		}
+		// Base64 encode
+		claimsB64 = base64.StdEncoding.EncodeToString([]byte(decoded))
+	}
+
+	// Login with claims challenge if we have one
+	var loginCmd *exec.Cmd
+	if claimsB64 != "" {
+		fmt.Println("Using ACRS claims challenge for authentication...")
+		loginCmd = exec.Command("az", "login",
+			"--scope", "https://api.azrbac.mspim.azure.com/.default",
+			"--claims-challenge", claimsB64)
+	} else {
+		loginCmd = exec.Command("az", "login",
+			"--scope", "https://api.azrbac.mspim.azure.com/.default")
+	}
+
 	loginCmd.Stdout = os.Stdout
 	loginCmd.Stderr = os.Stderr
 
 	if err := loginCmd.Run(); err != nil {
-		return fmt.Errorf("authentication failed: %w", err)
+		// If claims-challenge didn't work, try without it
+		if claimsB64 != "" && strings.Contains(err.Error(), "unrecognized arguments") {
+			fmt.Println("Retrying without claims parameter...")
+			loginCmd = exec.Command("az", "login",
+				"--scope", "https://api.azrbac.mspim.azure.com/.default")
+			loginCmd.Stdout = os.Stdout
+			loginCmd.Stderr = os.Stderr
+			if err := loginCmd.Run(); err != nil {
+				return fmt.Errorf("authentication failed: %w", err)
+			}
+		} else {
+			return fmt.Errorf("authentication failed: %w", err)
+		}
 	}
 
-	fmt.Println("\n✓ Browser login successful!")
-	fmt.Println()
-	fmt.Print("Please approve the request in your Azure Authenticator app now...")
-	fmt.Println()
-	fmt.Print("Press Enter after you have approved in the authenticator app: ")
-
-	// Wait for user to confirm they've approved in authenticator
-	reader := bufio.NewReader(os.Stdin)
-	reader.ReadString('\n')
-
-	fmt.Println("✓ Proceeding with activation...")
+	fmt.Println("\n✓ Authentication successful!")
 
 	return nil
 }

@@ -3,6 +3,7 @@ package pim
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os/exec"
 	"strings"
 )
@@ -146,4 +147,60 @@ func (c *UnifiedPIMClient) ActivateRoleAzRest(roleDefID, resourceID, justificati
 // DeactivateRoleAzRest wraps the az rest deactivation for the UnifiedPIMClient
 func (c *UnifiedPIMClient) DeactivateRoleAzRest(roleDefID, resourceID string) error {
 	return DeactivateRoleViaAzCLI(c.pimType, roleDefID, resourceID, c.principalID)
+}
+
+// GetMaxDurationViaAzCLI fetches the maximum allowed duration using az rest
+func GetMaxDurationViaAzCLI(pimType PIMType, resourceID, roleDefID string) (int, error) {
+	filter := fmt.Sprintf("(resource/id eq '%s') and (roleDefinition/id eq '%s')", resourceID, roleDefID)
+	apiURL := fmt.Sprintf("https://api.azrbac.mspim.azure.com/api/v2/privilegedAccess/%s/roleSettings?$filter=%s",
+		pimType, url.QueryEscape(filter))
+
+	cmd := exec.Command("az", "rest",
+		"--method", "GET",
+		"--resource", "https://api.azrbac.mspim.azure.com",
+		"--url", apiURL)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// Default to 5 hours if we can't fetch policy
+		return 300, nil
+	}
+
+	var result struct {
+		Value []struct {
+			UserMemberSettings []struct {
+				RuleIdentifier string `json:"ruleIdentifier"`
+				Setting        string `json:"setting"`
+			} `json:"userMemberSettings"`
+		} `json:"value"`
+	}
+
+	if err := json.Unmarshal(output, &result); err != nil {
+		return 300, nil // Default 5 hours
+	}
+
+	// Parse the userMemberSettings for ExpirationRule
+	for _, policy := range result.Value {
+		for _, setting := range policy.UserMemberSettings {
+			if setting.RuleIdentifier == "ExpirationRule" {
+				// Parse the JSON setting
+				var expirationSettings struct {
+					MaximumGrantPeriodInMinutes int `json:"maximumGrantPeriodInMinutes"`
+				}
+				if err := json.Unmarshal([]byte(setting.Setting), &expirationSettings); err == nil {
+					if expirationSettings.MaximumGrantPeriodInMinutes > 0 {
+						return expirationSettings.MaximumGrantPeriodInMinutes, nil
+					}
+				}
+			}
+		}
+	}
+
+	// Default to 5 hours if not found
+	return 300, nil
+}
+
+// GetMaxDurationAzRest wraps the az rest policy fetching for the UnifiedPIMClient
+func (c *UnifiedPIMClient) GetMaxDurationAzRest(resourceID, roleDefID string) (int, error) {
+	return GetMaxDurationViaAzCLI(c.pimType, resourceID, roleDefID)
 }

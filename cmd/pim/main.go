@@ -10,6 +10,8 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+
+	"github.com/manifoldco/promptui"
 )
 
 func main() {
@@ -114,31 +116,35 @@ func selectPIMType(mode string) string {
 		fmt.Println("╚═══════════════════════════════════════╝")
 	}
 
-	fmt.Println("\nSelect PIM type:")
-	fmt.Println("1. Groups")
-	fmt.Println("2. Azure Resources")
-	fmt.Println("3. Entra Roles")
-	fmt.Print("\nEnter selection (1-3): ")
+	items := []string{"Groups", "Azure Resources", "Entra Roles"}
 
-	var selection int
-	_, err := fmt.Scanln(&selection)
-	if err != nil || selection < 1 || selection > 3 {
-		fmt.Println("Invalid selection. Exiting.")
-		os.Exit(1)
+	prompt := promptui.Select{
+		Label: "Select PIM type",
+		Items: items,
+		Templates: &promptui.SelectTemplates{
+			Label:    "{{ . }}:",
+			Active:   "▸ {{ . | cyan }}",
+			Inactive: "  {{ . }}",
+			Selected: "✓ {{ . | green }}",
+		},
 	}
 
-	switch selection {
-	case 1:
-		fmt.Println("  -> Groups\n")
+	index, _, err := prompt.Run()
+	if err != nil {
+		fmt.Println("\nExiting...")
+		os.Exit(0)
+	}
+
+	fmt.Println()
+
+	switch index {
+	case 0:
 		return string(pim.PIMTypeGroups)
-	case 2:
-		fmt.Println("  -> Azure Resources\n")
+	case 1:
 		return string(pim.PIMTypeAzureResources)
-	case 3:
-		fmt.Println("  -> Entra Roles\n")
+	case 2:
 		return string(pim.PIMTypeEntraRoles)
 	default:
-		fmt.Println("Invalid selection. Exiting.")
 		os.Exit(1)
 		return ""
 	}
@@ -352,11 +358,11 @@ func deactivateRoleByName(client *pim.UnifiedPIMClient, roles []models.RoleAssig
 func activateSelectedRole(client *pim.UnifiedPIMClient, role *models.RoleAssignment, pimTypeStr string) {
 	fmt.Printf("\n✓ Selected: %s\n\n", role.RoleName)
 
-	// Fetch max duration
+	// Fetch max duration using az rest
 	fmt.Println("Fetching role policy...")
-	maxMinutes, err := client.GetMaxDuration(role.ResourceID, role.RoleDefinitionID)
+	maxMinutes, err := client.GetMaxDurationAzRest(role.ResourceID, role.RoleDefinitionID)
 	if err != nil {
-		maxMinutes = 480 // Default to 8 hours
+		maxMinutes = 300 // Default to 5 hours
 	}
 	maxHours := maxMinutes / 60
 	if maxHours == 0 {
@@ -459,31 +465,32 @@ func activateSelectedRole(client *pim.UnifiedPIMClient, role *models.RoleAssignm
 }
 
 func selectRole(roles []models.RoleAssignment, action string) *models.RoleAssignment {
-	fmt.Printf("\nSelect a role to %s:\n\n", action)
-
-	// Display roles with "All" option
-	fmt.Println("0. All")
+	// Build items list with "All" option
+	items := make([]string, len(roles)+1)
+	items[0] = "All"
 	for i, role := range roles {
-		fmt.Printf("%d. %s\n", i+1, role.RoleName)
+		items[i+1] = role.RoleName
 	}
 
-	fmt.Printf("\nEnter selection (0-%d) or q to quit: ", len(roles))
+	prompt := promptui.Select{
+		Label: fmt.Sprintf("Select a role to %s", action),
+		Items: items,
+		Size:  20,
+		Templates: &promptui.SelectTemplates{
+			Label:    "{{ . }}:",
+			Active:   "▸ {{ . | cyan }}",
+			Inactive: "  {{ . }}",
+			Selected: "✓ {{ . | green }}",
+		},
+	}
 
-	var input string
-	fmt.Scanln(&input)
-
-	if input == "q" || input == "Q" {
+	index, _, err := prompt.Run()
+	if err != nil {
+		fmt.Println("\n👋 Cancelled")
 		return nil
 	}
 
-	var selection int
-	_, err := fmt.Sscanf(input, "%d", &selection)
-	if err != nil || selection < 0 || selection > len(roles) {
-		fmt.Println("Invalid selection.")
-		return nil
-	}
-
-	if selection == 0 {
+	if index == 0 {
 		// Activate/deactivate all
 		fmt.Println()
 		ctx, _ := auth.GetAzureContext()
@@ -516,8 +523,8 @@ func selectRole(roles []models.RoleAssignment, action string) *models.RoleAssign
 		return nil
 	}
 
-	fmt.Printf("  -> %s\n", roles[selection-1].RoleName)
-	return &roles[selection-1]
+	// Return the selected role (index-1 because of "All" at position 0)
+	return &roles[index-1]
 }
 
 func filterActiveRoles(eligible, active []models.RoleAssignment) []models.RoleAssignment {
