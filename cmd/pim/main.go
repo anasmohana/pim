@@ -18,7 +18,7 @@ func main() {
 	args := os.Args[1:]
 
 	// Parse command-line arguments
-	pimType, mode, roleName := parseArgs(args)
+	pimType, mode, roleName, justification, durationHours := parseArgs(args)
 
 	if pimType == "" {
 		// No PIM type specified - show selection menu
@@ -29,15 +29,17 @@ func main() {
 	case "deactivate":
 		handleDeactivate(pimType, roleName)
 	default:
-		handleActivate(pimType, roleName)
+		handleActivate(pimType, roleName, justification, durationHours)
 	}
 }
 
-// parseArgs parses command-line arguments and returns (pimType, mode, roleName)
-func parseArgs(args []string) (string, string, string) {
+// parseArgs parses command-line arguments and returns (pimType, mode, roleName, justification, durationHours)
+func parseArgs(args []string) (string, string, string, string, int) {
 	pimType := ""
 	mode := "activate"
 	roleName := ""
+	justification := ""
+	durationHours := 0
 
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
@@ -65,6 +67,16 @@ func parseArgs(args []string) (string, string, string) {
 				roleName = args[i+1]
 				i++
 			}
+		case "-j", "--justification":
+			if i+1 < len(args) {
+				justification = args[i+1]
+				i++
+			}
+		case "-d", "--duration":
+			if i+1 < len(args) {
+				fmt.Sscanf(args[i+1], "%d", &durationHours)
+				i++
+			}
 		case "d", "deactivate":
 			mode = "deactivate"
 		default:
@@ -74,7 +86,7 @@ func parseArgs(args []string) (string, string, string) {
 		}
 	}
 
-	return pimType, mode, roleName
+	return pimType, mode, roleName, justification, durationHours
 }
 
 func isFlag(arg string) bool {
@@ -87,22 +99,25 @@ func printUsage() {
 	fmt.Println("Usage: pim [OPTIONS] [ACTION]")
 	fmt.Println()
 	fmt.Println("Options:")
-	fmt.Println("  -h, --help          Show this help message")
-	fmt.Println("  -g, --group [NAME]  PIM type: Azure AD Groups")
-	fmt.Println("  -r, --resource [NAME] PIM type: Azure Resources")
-	fmt.Println("  -e, --entra [NAME]  PIM type: Microsoft Entra Roles")
+	fmt.Println("  -h, --help                    Show this help message")
+	fmt.Println("  -g, --group [NAME]            PIM type: Azure AD Groups")
+	fmt.Println("  -r, --resource [NAME]         PIM type: Azure Resources")
+	fmt.Println("  -e, --entra [NAME]            PIM type: Microsoft Entra Roles")
+	fmt.Println("  -j, --justification TEXT      Justification for activation (skips prompt)")
+	fmt.Println("  -d, --duration HOURS          Duration in hours (skips prompt)")
 	fmt.Println()
 	fmt.Println("Actions:")
 	fmt.Println("  deactivate, d       Deactivate an active role")
 	fmt.Println()
 	fmt.Println("Examples:")
-	fmt.Println("  pim                     # Interactive mode with PIM type selection")
-	fmt.Println("  pim -g                  # List and activate Azure AD Groups")
-	fmt.Println("  pim -g my-group-name    # Activate specific group")
-	fmt.Println("  pim -r                  # List and activate Azure Resources")
-	fmt.Println("  pim -e                  # List and activate Entra Roles")
-	fmt.Println("  pim d -g                # Deactivate a group role")
-	fmt.Println("  pim deactivate -r       # Deactivate a resource role")
+	fmt.Println("  pim                                            # Interactive mode")
+	fmt.Println("  pim -g                                         # List and activate Azure AD Groups")
+	fmt.Println("  pim -g my-group-name                           # Activate specific group (prompts for justification/duration)")
+	fmt.Println("  pim -g my-group -j \"I have work to do\" -d 8   # Fully non-interactive activation")
+	fmt.Println("  pim -r                                         # List and activate Azure Resources")
+	fmt.Println("  pim -e                                         # List and activate Entra Roles")
+	fmt.Println("  pim d -g                                       # Deactivate a group role")
+	fmt.Println("  pim deactivate -r                              # Deactivate a resource role")
 }
 
 func selectPIMType(mode string) string {
@@ -150,7 +165,7 @@ func selectPIMType(mode string) string {
 	}
 }
 
-func handleActivate(pimTypeStr, roleName string) {
+func handleActivate(pimTypeStr, roleName, justification string, durationHours int) {
 	fmt.Println("╔═══════════════════════════════════════╗")
 	fmt.Printf("║   Azure PIM Activator (%s)%s║\n", getPIMLabel(pimTypeStr), strings.Repeat(" ", 14-len(getPIMLabel(pimTypeStr))))
 	fmt.Println("╚═══════════════════════════════════════╝")
@@ -203,7 +218,7 @@ func handleActivate(pimTypeStr, roleName string) {
 
 	// If role name specified, activate directly
 	if roleName != "" {
-		activateRoleByName(client, availableRoles, roleName, pimTypeStr)
+		activateRoleByName(client, availableRoles, roleName, pimTypeStr, justification, durationHours)
 		return
 	}
 
@@ -215,7 +230,7 @@ func handleActivate(pimTypeStr, roleName string) {
 	}
 
 	// Activate the role
-	activateSelectedRole(client, selectedRole, pimTypeStr)
+	activateSelectedRole(client, selectedRole, pimTypeStr, justification, durationHours)
 }
 
 func handleDeactivate(pimTypeStr, roleName string) {
@@ -312,7 +327,7 @@ func handleDeactivate(pimTypeStr, roleName string) {
 	fmt.Printf("✓ Deactivated: %s\n", selectedRole.RoleName)
 }
 
-func activateRoleByName(client *pim.UnifiedPIMClient, roles []models.RoleAssignment, name, pimTypeStr string) {
+func activateRoleByName(client *pim.UnifiedPIMClient, roles []models.RoleAssignment, name, pimTypeStr, justification string, durationHours int) {
 	// Find role by name
 	var found *models.RoleAssignment
 	for i := range roles {
@@ -327,7 +342,7 @@ func activateRoleByName(client *pim.UnifiedPIMClient, roles []models.RoleAssignm
 		os.Exit(1)
 	}
 
-	activateSelectedRole(client, found, pimTypeStr)
+	activateSelectedRole(client, found, pimTypeStr, justification, durationHours)
 }
 
 func deactivateRoleByName(client *pim.UnifiedPIMClient, roles []models.RoleAssignment, name, pimTypeStr string) {
@@ -355,7 +370,7 @@ func deactivateRoleByName(client *pim.UnifiedPIMClient, roles []models.RoleAssig
 	fmt.Printf("✓ Deactivated: %s\n", found.RoleName)
 }
 
-func activateSelectedRole(client *pim.UnifiedPIMClient, role *models.RoleAssignment, pimTypeStr string) {
+func activateSelectedRole(client *pim.UnifiedPIMClient, role *models.RoleAssignment, pimTypeStr, justification string, durationHours int) {
 	fmt.Printf("\n✓ Selected: %s\n\n", role.RoleName)
 
 	// Fetch max duration using az rest
@@ -371,48 +386,52 @@ func activateSelectedRole(client *pim.UnifiedPIMClient, role *models.RoleAssignm
 	fmt.Printf("✓ Maximum allowed duration: %d hours\n\n", maxHours)
 
 	// Get justification
-	reader := bufio.NewReader(os.Stdin)
-	var justification string
-	for {
-		fmt.Print("Enter justification (reason for activation): ")
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			fmt.Println("⚠ Error reading input. Please try again.")
-			continue
-		}
+	if justification == "" {
+		reader := bufio.NewReader(os.Stdin)
+		for {
+			fmt.Print("Enter justification (reason for activation): ")
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				fmt.Println("⚠ Error reading input. Please try again.")
+				continue
+			}
 
-		justification = strings.TrimSpace(line)
-		if justification == "" {
-			justification = "Routine administrative access"
+			justification = strings.TrimSpace(line)
+			if justification == "" {
+				justification = "Routine administrative access"
+			}
 			break
 		}
-		break
 	}
 
 	// Get duration
-	var durationHours int
-	for {
-		fmt.Printf("Enter duration in hours (default: %d, max: %d): ", maxHours, maxHours)
-		var input string
-		fmt.Scanln(&input)
+	if durationHours <= 0 {
+		for {
+			fmt.Printf("Enter duration in hours (default: %d, max: %d): ", maxHours, maxHours)
+			var input string
+			fmt.Scanln(&input)
 
-		if input == "" {
-			durationHours = maxHours
+			if input == "" {
+				durationHours = maxHours
+				break
+			}
+
+			_, err := fmt.Sscanf(input, "%d", &durationHours)
+			if err != nil || durationHours <= 0 {
+				fmt.Println("⚠ Invalid duration. Please enter a positive number.")
+				continue
+			}
+
+			if durationHours > maxHours {
+				fmt.Printf("⚠ Duration exceeds maximum allowed (%d hours). Please try again.\n", maxHours)
+				continue
+			}
+
 			break
 		}
-
-		_, err := fmt.Sscanf(input, "%d", &durationHours)
-		if err != nil || durationHours <= 0 {
-			fmt.Println("⚠ Invalid duration. Please enter a positive number.")
-			continue
-		}
-
-		if durationHours > maxHours {
-			fmt.Printf("⚠ Duration exceeds maximum allowed (%d hours). Please try again.\n", maxHours)
-			continue
-		}
-
-		break
+	} else if durationHours > maxHours {
+		fmt.Printf("⚠ Requested duration (%dh) exceeds maximum allowed (%dh), capping to %dh.\n", durationHours, maxHours, maxHours)
+		durationHours = maxHours
 	}
 
 	duration := fmt.Sprintf("PT%dH", durationHours)
@@ -566,7 +585,7 @@ func handleMFAError(mfaErr *pim.MFARequiredError, pimTypeStr, principalID, roleN
 
 		// Recursively retry
 		if mode == "activate" {
-			handleActivate(pimTypeStr, roleName)
+			handleActivate(pimTypeStr, roleName, "", 0)
 		} else {
 			handleDeactivate(pimTypeStr, roleName)
 		}
