@@ -11,6 +11,7 @@ A command-line tool for managing Microsoft Azure Privileged Identity Management 
 - ✅ **Interactive UI** - Select roles interactively or activate by name
 - ✅ **Smart Filtering** - Filters out already-active roles from eligible list
 - ✅ **Direct Activation** - `pim -g my-group-name` for quick activation
+- ✅ **Non-Interactive Mode** - Pass justification and duration as flags for scripting/automation
 - ✅ **Deactivation Support** - Full deactivation support for all PIM types
 - ✅ **Policy-Aware** - Auto-detects maximum allowed duration per role
 
@@ -83,6 +84,9 @@ pim
 # Activate an Azure AD Group directly
 pim -g aws-pim-access
 
+# Activate non-interactively with justification and duration
+pim -g my-group -j "I have work to do" -d 8
+
 # Activate an Azure Resource role
 pim -r
 
@@ -102,22 +106,25 @@ pim deactivate -r
 Usage: pim [OPTIONS] [ACTION]
 
 Options:
-  -h, --help          Show this help message
-  -g, --group [NAME]  PIM type: Azure AD Groups
-  -r, --resource [NAME] PIM type: Azure Resources
-  -e, --entra [NAME]  PIM type: Microsoft Entra Roles
+  -h, --help                    Show this help message
+  -g, --group [NAME]            PIM type: Azure AD Groups
+  -r, --resource [NAME]         PIM type: Azure Resources
+  -e, --entra [NAME]            PIM type: Microsoft Entra Roles
+  -j, --justification TEXT      Justification for activation (skips prompt)
+  -d, --duration HOURS          Duration in hours (skips prompt)
 
 Actions:
   deactivate, d       Deactivate an active role
 
 Examples:
-  pim                     # Interactive mode with PIM type selection
-  pim -g                  # List and activate Azure AD Groups
-  pim -g my-group-name    # Activate specific group by name
-  pim -r                  # List and activate Azure Resources
-  pim -e                  # List and activate Entra Roles
-  pim d -g                # Deactivate a group role
-  pim deactivate -r       # Deactivate a resource role
+  pim                                            # Interactive mode
+  pim -g                                         # List and activate Azure AD Groups
+  pim -g my-group-name                           # Activate specific group by name
+  pim -g my-group -j "I have work to do" -d 8   # Fully non-interactive activation
+  pim -r                                         # List and activate Azure Resources
+  pim -e                                         # List and activate Entra Roles
+  pim d -g                                       # Deactivate a group role
+  pim deactivate -r                              # Deactivate a resource role
 ```
 
 ### Interactive Mode
@@ -150,6 +157,21 @@ pim -r contributor
 # Activate a specific Entra role
 pim -e "Global Administrator"
 ```
+
+### Non-Interactive Mode
+
+Pass `-j` and `-d` to skip all prompts — useful for scripting and automation:
+
+```bash
+# Fully non-interactive activation
+pim -g my-group -j "Deployment work" -d 8
+
+# Works with all PIM types
+pim -r contributor -j "Infra change" -d 2
+pim -e "Global Administrator" -j "Emergency access" -d 1
+```
+
+If either flag is omitted, the tool falls back to an interactive prompt for that field. If `-d` exceeds the role's policy maximum, it is automatically capped.
 
 ### Deactivation
 
