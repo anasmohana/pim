@@ -41,7 +41,7 @@ func (c *AzureResourcePIMClient) ListEligibleRoles() ([]models.RoleAssignment, e
 	req.Header.Set("Authorization", "Bearer "+c.accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: httpTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
@@ -49,8 +49,8 @@ func (c *AzureResourcePIMClient) ListEligibleRoles() ([]models.RoleAssignment, e
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+		io.Copy(io.Discard, resp.Body)
+		return nil, fmt.Errorf("API request failed with status %d", resp.StatusCode)
 	}
 
 	var result struct {
@@ -111,7 +111,7 @@ func (c *AzureResourcePIMClient) ListActiveRoles() ([]models.RoleAssignment, err
 	req.Header.Set("Authorization", "Bearer "+c.accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: httpTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
@@ -119,8 +119,8 @@ func (c *AzureResourcePIMClient) ListActiveRoles() ([]models.RoleAssignment, err
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+		io.Copy(io.Discard, resp.Body)
+		return nil, fmt.Errorf("API request failed with status %d", resp.StatusCode)
 	}
 
 	var result struct {
@@ -209,7 +209,7 @@ func (c *AzureResourcePIMClient) ActivateRole(scope string, req models.Activatio
 	httpReq.Header.Set("Authorization", "Bearer "+c.accessToken)
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: httpTimeout}
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("failed to execute request: %w", err)
@@ -217,8 +217,8 @@ func (c *AzureResourcePIMClient) ActivateRole(scope string, req models.Activatio
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("activation failed with status %d: %s", resp.StatusCode, string(body))
+		io.Copy(io.Discard, resp.Body)
+		return fmt.Errorf("activation failed with status %d", resp.StatusCode)
 	}
 
 	return nil
@@ -251,7 +251,7 @@ func (c *AzureResourcePIMClient) DeactivateRole(scope string, roleDefinitionID s
 	httpReq.Header.Set("Authorization", "Bearer "+c.accessToken)
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: httpTimeout}
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("failed to execute request: %w", err)
@@ -259,8 +259,8 @@ func (c *AzureResourcePIMClient) DeactivateRole(scope string, roleDefinitionID s
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("deactivation failed with status %d: %s", resp.StatusCode, string(body))
+		io.Copy(io.Discard, resp.Body)
+		return fmt.Errorf("deactivation failed with status %d", resp.StatusCode)
 	}
 
 	return nil
@@ -299,7 +299,7 @@ func (c *AzureResourcePIMClient) getRoleName(roleDefinitionID string) (string, e
 	req.Header.Set("Authorization", "Bearer "+c.accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: httpTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
 		return roleGUID, nil
@@ -307,7 +307,8 @@ func (c *AzureResourcePIMClient) getRoleName(roleDefinitionID string) (string, e
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return roleGUID, nil // Return GUID if we can't get the name
+		io.Copy(io.Discard, resp.Body)
+		return roleGUID, nil
 	}
 
 	var result struct {
@@ -359,7 +360,7 @@ func (c *AzureResourcePIMClient) GetRolePolicy(scope string, roleDefinitionID st
 	req.Header.Set("Authorization", "Bearer "+c.accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: httpTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
 		return 5, err

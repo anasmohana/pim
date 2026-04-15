@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -26,38 +27,7 @@ func ActivateRoleViaAzCLI(pimType PIMType, roleDefID, resourceID, subjectID, jus
 		},
 	}
 
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	// Use az rest instead of direct HTTP - this preserves ACRS context
-	cmd := exec.Command("az", "rest",
-		"--method", "POST",
-		"--resource", "https://api.azrbac.mspim.azure.com",
-		"--url", apiURL,
-		"--headers", "Content-Type=application/json",
-		"--body", string(jsonData))
-
-	output, err := cmd.CombinedOutput()
-	outputStr := string(output)
-
-	// Check for success (even with warnings in output)
-	if err == nil {
-		return nil
-	}
-
-	// Check if it's an MFA error
-	if isMFAError(outputStr) {
-		return &MFARequiredError{
-			StatusCode: 400,
-			Body:       outputStr,
-			ClaimValue: extractClaimFromOutput(outputStr),
-		}
-	}
-
-	// Return the full error with output
-	return fmt.Errorf("activation failed: %w\nOutput: %s", err, outputStr)
+	return azRestPost(apiURL, payload)
 }
 
 // DeactivateRoleViaAzCLI deactivates a role using az rest
@@ -72,32 +42,53 @@ func DeactivateRoleViaAzCLI(pimType PIMType, roleDefID, resourceID, subjectID st
 		"type":             "UserRemove",
 	}
 
+	return azRestPost(apiURL, payload)
+}
+
+// azRestPost marshals payload to a temp file and calls az rest --body @file,
+// preventing sensitive values from appearing in the process list.
+func azRestPost(apiURL string, payload map[string]interface{}) error {
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
+
+	tmpFile, err := os.CreateTemp("", "pim-body-*.json")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+
+	if _, err := tmpFile.Write(jsonData); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("failed to write temp file: %w", err)
+	}
+	tmpFile.Close()
 
 	cmd := exec.Command("az", "rest",
 		"--method", "POST",
 		"--resource", "https://api.azrbac.mspim.azure.com",
 		"--url", apiURL,
 		"--headers", "Content-Type=application/json",
-		"--body", string(jsonData))
+		"--body", "@"+tmpPath)
 
 	output, err := cmd.CombinedOutput()
-	if err != nil {
-		outputStr := string(output)
-		if isMFAError(outputStr) {
-			return &MFARequiredError{
-				StatusCode: 400,
-				Body:       outputStr,
-				ClaimValue: extractClaimFromOutput(outputStr),
-			}
-		}
-		return fmt.Errorf("deactivation failed: %s", string(output))
+	outputStr := string(output)
+
+	if err == nil {
+		return nil
 	}
 
-	return nil
+	if isMFAError(outputStr) {
+		return &MFARequiredError{
+			StatusCode: 400,
+			Body:       outputStr,
+			ClaimValue: extractClaimFromOutput(outputStr),
+		}
+	}
+
+	return fmt.Errorf("az rest request failed: %w", err)
 }
 
 // Helper to check if error is MFA-related
@@ -123,10 +114,8 @@ func isMFAError(output string) bool {
 
 // Extract claim value from error output
 func extractClaimFromOutput(output string) string {
-	// Look for claims= in the error
 	if idx := strings.Index(output, "claims="); idx != -1 {
-		rest := output[idx+7:] // Skip "claims="
-		// Find end of claim value (usually at quote, ampersand, or closing paren)
+		rest := output[idx+7:]
 		endChars := []string{"\"", "&", ")", " ", "\n"}
 		endIdx := len(rest)
 		for _, char := range endChars {
@@ -162,7 +151,6 @@ func GetMaxDurationViaAzCLI(pimType PIMType, resourceID, roleDefID string) (int,
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		// Default to 5 hours if we can't fetch policy
 		return 300, nil
 	}
 
@@ -176,14 +164,12 @@ func GetMaxDurationViaAzCLI(pimType PIMType, resourceID, roleDefID string) (int,
 	}
 
 	if err := json.Unmarshal(output, &result); err != nil {
-		return 300, nil // Default 5 hours
+		return 300, nil
 	}
 
-	// Parse the userMemberSettings for ExpirationRule
 	for _, policy := range result.Value {
 		for _, setting := range policy.UserMemberSettings {
 			if setting.RuleIdentifier == "ExpirationRule" {
-				// Parse the JSON setting
 				var expirationSettings struct {
 					MaximumGrantPeriodInMinutes int `json:"maximumGrantPeriodInMinutes"`
 				}
@@ -196,7 +182,6 @@ func GetMaxDurationViaAzCLI(pimType PIMType, resourceID, roleDefID string) (int,
 		}
 	}
 
-	// Default to 5 hours if not found
 	return 300, nil
 }
 
@@ -204,3 +189,4 @@ func GetMaxDurationViaAzCLI(pimType PIMType, resourceID, roleDefID string) (int,
 func (c *UnifiedPIMClient) GetMaxDurationAzRest(resourceID, roleDefID string) (int, error) {
 	return GetMaxDurationViaAzCLI(c.pimType, resourceID, roleDefID)
 }
+

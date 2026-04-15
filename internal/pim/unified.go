@@ -84,7 +84,7 @@ func (c *UnifiedPIMClient) listRoles(state string) ([]models.RoleAssignment, err
 				Body:       string(body),
 			}
 		}
-		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("API request failed with status %d", resp.StatusCode)
 	}
 
 	var result struct {
@@ -278,7 +278,7 @@ func (c *UnifiedPIMClient) executeRoleRequest(apiURL string, payload map[string]
 				ClaimValue: c.extractClaimValue(string(body)),
 			}
 		}
-		return fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("request failed with status %d", resp.StatusCode)
 	}
 
 	return nil

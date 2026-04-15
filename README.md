@@ -107,8 +107,9 @@ Usage: pim [OPTIONS] [ACTION]
 
 Options:
   -h, --help                    Show this help message
-  -g, --group [NAME]            PIM type: Azure AD Groups
-  -r, --resource [NAME]         PIM type: Azure Resources
+  -g, --group [NAME]            PIM type: Azure AD Groups (NAME = group name)
+  -r, --resource [RESOURCE]     PIM type: Azure Resources (RESOURCE = resource/scope filter)
+  -ro, --role ROLE              Role name to activate (use with -r to target specific role)
   -e, --entra [NAME]            PIM type: Microsoft Entra Roles
   -j, --justification TEXT      Justification for activation (skips prompt)
   -d, --duration HOURS          Duration in hours (skips prompt)
@@ -117,14 +118,16 @@ Actions:
   deactivate, d       Deactivate an active role
 
 Examples:
-  pim                                            # Interactive mode
-  pim -g                                         # List and activate Azure AD Groups
-  pim -g my-group-name                           # Activate specific group by name
-  pim -g my-group -j "I have work to do" -d 8   # Fully non-interactive activation
-  pim -r                                         # List and activate Azure Resources
-  pim -e                                         # List and activate Entra Roles
-  pim d -g                                       # Deactivate a group role
-  pim deactivate -r                              # Deactivate a resource role
+  pim                                                          # Interactive mode
+  pim -g                                                       # List and activate Azure AD Groups
+  pim -g my-group-name                                         # Activate specific group by name
+  pim -g my-group -j "I have work to do" -d 8                 # Fully non-interactive group activation
+  pim -r                                                       # List and activate Azure Resources
+  pim -r my-resource                                             # List roles filtered to my-resource
+  pim -r my-resource -ro contributor -j "Infra change" -d 2     # Fully non-interactive resource activation
+  pim -e                                                       # List and activate Entra Roles
+  pim d -g                                                     # Deactivate a group role
+  pim deactivate -r                                            # Deactivate a resource role
 ```
 
 ### Interactive Mode
@@ -151,8 +154,8 @@ Activate a role directly by specifying its name:
 # Activate a specific group
 pim -g my-pim-group
 
-# Activate a specific resource role (partial match supported)
-pim -r contributor
+# Activate a resource role on a specific resource (partial match supported)
+pim -r my-resource -ro contributor
 
 # Activate a specific Entra role
 pim -e "Global Administrator"
@@ -163,15 +166,18 @@ pim -e "Global Administrator"
 Pass `-j` and `-d` to skip all prompts — useful for scripting and automation:
 
 ```bash
-# Fully non-interactive activation
+# Fully non-interactive group activation
 pim -g my-group -j "Deployment work" -d 8
 
-# Works with all PIM types
-pim -r contributor -j "Infra change" -d 2
+# Resource activation: use -r for resource filter and -ro for role name
+pim -r my-resource -ro contributor -j "Infra change" -d 2
+pim -r my-resource-uat -ro contributor -j "UAT deployment" -d 4
+
+# Entra role activation
 pim -e "Global Administrator" -j "Emergency access" -d 1
 ```
 
-If either flag is omitted, the tool falls back to an interactive prompt for that field. If `-d` exceeds the role's policy maximum, it is automatically capped.
+For Azure Resources, the same role name (e.g. `contributor`) can exist on multiple resources. Use `-r` to filter by resource name and `-ro` to specify the role — both support case-insensitive partial matching.
 
 ### Deactivation
 

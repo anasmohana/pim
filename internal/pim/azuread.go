@@ -13,6 +13,7 @@ import (
 const (
 	graphBaseURL = "https://graph.microsoft.com/v1.0"
 	betaBaseURL  = "https://graph.microsoft.com/beta"
+	httpTimeout  = 30 * time.Second
 )
 
 // AzureADPIMClient handles Azure AD PIM operations
@@ -31,7 +32,6 @@ func NewAzureADPIMClient(accessToken, principalID string) *AzureADPIMClient {
 
 // ListEligibleRoles lists all eligible Azure AD roles
 func (c *AzureADPIMClient) ListEligibleRoles() ([]models.RoleAssignment, error) {
-	// Fetch all and filter client-side due to Graph API filter limitations
 	url := fmt.Sprintf("%s/roleManagement/directory/roleEligibilityScheduleInstances?$expand=roleDefinition", betaBaseURL)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -42,7 +42,7 @@ func (c *AzureADPIMClient) ListEligibleRoles() ([]models.RoleAssignment, error) 
 	req.Header.Set("Authorization", "Bearer "+c.accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: httpTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
@@ -50,8 +50,8 @@ func (c *AzureADPIMClient) ListEligibleRoles() ([]models.RoleAssignment, error) 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+		io.Copy(io.Discard, resp.Body) // drain to reuse connection
+		return nil, fmt.Errorf("API request failed with status %d", resp.StatusCode)
 	}
 
 	var result struct {
@@ -72,10 +72,8 @@ func (c *AzureADPIMClient) ListEligibleRoles() ([]models.RoleAssignment, error) 
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	// Filter client-side for the current principal
 	roles := make([]models.RoleAssignment, 0)
 	for _, item := range result.Value {
-		// Only include roles for the current principal
 		if item.PrincipalID != c.principalID {
 			continue
 		}
@@ -112,7 +110,7 @@ func (c *AzureADPIMClient) ListActiveRoles() ([]models.RoleAssignment, error) {
 	req.Header.Set("Authorization", "Bearer "+c.accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: httpTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
@@ -120,21 +118,21 @@ func (c *AzureADPIMClient) ListActiveRoles() ([]models.RoleAssignment, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+		io.Copy(io.Discard, resp.Body)
+		return nil, fmt.Errorf("API request failed with status %d", resp.StatusCode)
 	}
 
 	var result struct {
 		Value []struct {
-			ID                     string `json:"id"`
-			RoleDefinitionID       string `json:"roleDefinitionId"`
-			PrincipalID            string `json:"principalId"`
-			DirectoryScopeID       string `json:"directoryScopeId"`
-			StartDateTime          string `json:"startDateTime"`
-			EndDateTime            string `json:"endDateTime"`
-			AssignmentType         string `json:"assignmentType"`
-			MemberType             string `json:"memberType"`
-			RoleDefinition         struct {
+			ID               string `json:"id"`
+			RoleDefinitionID string `json:"roleDefinitionId"`
+			PrincipalID      string `json:"principalId"`
+			DirectoryScopeID string `json:"directoryScopeId"`
+			StartDateTime    string `json:"startDateTime"`
+			EndDateTime      string `json:"endDateTime"`
+			AssignmentType   string `json:"assignmentType"`
+			MemberType       string `json:"memberType"`
+			RoleDefinition   struct {
 				DisplayName string `json:"displayName"`
 			} `json:"roleDefinition"`
 		} `json:"value"`
@@ -144,10 +142,8 @@ func (c *AzureADPIMClient) ListActiveRoles() ([]models.RoleAssignment, error) {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	// Filter client-side for the current principal
 	roles := make([]models.RoleAssignment, 0)
 	for _, item := range result.Value {
-		// Only include roles for the current principal
 		if item.PrincipalID != c.principalID {
 			continue
 		}
@@ -211,7 +207,7 @@ func (c *AzureADPIMClient) ActivateRole(req models.ActivationRequest) error {
 	httpReq.Header.Set("Authorization", "Bearer "+c.accessToken)
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: httpTimeout}
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("failed to execute request: %w", err)
@@ -219,8 +215,8 @@ func (c *AzureADPIMClient) ActivateRole(req models.ActivationRequest) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("activation failed with status %d: %s", resp.StatusCode, string(body))
+		io.Copy(io.Discard, resp.Body)
+		return fmt.Errorf("activation failed with status %d", resp.StatusCode)
 	}
 
 	return nil
@@ -250,7 +246,7 @@ func (c *AzureADPIMClient) DeactivateRole(roleDefinitionID string) error {
 	httpReq.Header.Set("Authorization", "Bearer "+c.accessToken)
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: httpTimeout}
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("failed to execute request: %w", err)
@@ -258,8 +254,8 @@ func (c *AzureADPIMClient) DeactivateRole(roleDefinitionID string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("deactivation failed with status %d: %s", resp.StatusCode, string(body))
+		io.Copy(io.Discard, resp.Body)
+		return fmt.Errorf("deactivation failed with status %d", resp.StatusCode)
 	}
 
 	return nil
@@ -277,7 +273,7 @@ func GetPrincipalID(accessToken string) (string, error) {
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: httpTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to execute request: %w", err)
@@ -285,8 +281,8 @@ func GetPrincipalID(accessToken string) (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("failed to get user info with status %d: %s", resp.StatusCode, string(body))
+		io.Copy(io.Discard, resp.Body)
+		return "", fmt.Errorf("failed to get user info with status %d", resp.StatusCode)
 	}
 
 	var result struct {
